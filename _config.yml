@@ -1,43 +1,41 @@
 # SITE CONFIGURATION
-baseurl: "/type-theme"
-url: "https://rohanchandra.github.io/"
+baseurl: "/"
+# url: "https://localhost:4000/"
+url: "https://archern9.github.io/"
 
 # THEME-SPECIFIC CONFIGURATION
 theme_settings:
   # Meta
-  title: Type Theme
+  title: ArcherN9's Blog
   avatar: assets/img/avatar.png
   favicon: assets/favicon.ico
   gravatar: # Email MD5 hash
-  description: "A website with blog posts and pages" # used by search engines
+  description: "Archer's blog for How-Tos" # used by search engines
 
   # Header and footer text
-  header_text: >
-     <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-
-     <p>Remove all header text in <code>_config.yml</code> to disable this feature.</p>
+  header_text:
   header_text_feature_image:
-  footer_text: >
-   Powered by <a href="https://jekyllrb.com/">Jekyll</a> with <a href="https://github.com/rohanchandra/type-theme">Type Theme</a>
+  footer_text:
+   Powered by <a href="https://jekyllrb.com/">Jekyll</a>.
 
   # Icons
   rss: false
-  email_address: # Full email address, e.g. "sam@example.com"
+  email_address: divya.s90@yahoo.com
   behance:
   bitbucket:
   dribbble:
   facebook:
   flickr:
   gitlab:
-  github: "rohanchandra/type-theme"
+  github: ArcherN9
   gitter:
   google_plus:
   instagram:
   linkedin:  # Full URL
   pinterest:
-  reddit:
+  reddit: ArcherN9
   soundcloud:
-  stack_exchange:  # Full URL
+  stack_exchange: # Full URL
   steam:
   tumblr:
   twitter:
