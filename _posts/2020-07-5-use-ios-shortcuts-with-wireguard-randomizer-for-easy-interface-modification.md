@@ -26,7 +26,7 @@ It is important to note that a shortcut is a collection of multiple actions that
 
 ## Shortcut - What is my IP?
 
-When on a VPN, chances of searching for "ip address" on DuckDuckGo or a similar IP revealing services are recurrent. Complexity is added when a raspberry pi is running headless and does not have access to a browser.
+When on a VPN, searches for "ip address" on DuckDuckGo or access to a similar IP revealing service are recurrent. Complexity is added when a raspberry pi is running headless and does not have access to a browser.
 
 Open the shortcuts application on the iOS device and tap on the *Create Shortcut* card or the *plus* icon on the top right corner. The new screen is where numerous actions are collated. Tap on *Add Action*, search for & select **Run Script over SSH**. This action, as the name states, connects to a server through SSH and executes a series of BASH commands.
 
