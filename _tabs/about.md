@@ -19,6 +19,6 @@ at hiding my true identity.
 I'm available for a chat on various IRC channels - #archlinux-newbie,
 #archlinux-classroom, #wireguard & #xrdp on Libera.Chat, #Android on Snoonet, 
 Channels - Azure, Flutter & UnixPorn on Discord servers and of course, my
-[email](archern9@protonmail.com).
+[email](mailto:archern9@protonmail.com).
 
 I'd be glad to say hi!
