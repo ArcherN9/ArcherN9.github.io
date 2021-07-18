@@ -1,28 +1,45 @@
 ---
-layout: post
 title: "Execute UI Tests on App Center through APIs"
+author: ArcherN9
+date: 2018-06-09 10:00:00 +0000
 description: "App center has an API first policy. Easier said than done."
-category: articles
-tags: [Azure DevOps, VSAC, Visual Studio App]
-feature-img: "/assets/img/azure-featureimage.png"
+category: [Android]
+tags: [AppCenter, API, Integrations, UI Testing]
+image:
+  src: "/assets/img/azure-featureimage.png"
 ---
 
-Visual Studio App center (VSAC) is great! It virtually eliminates the humongous effort it usually requires to setup a DevOps pipeline. As an end user, I am completely satisfied with what is on offer. As a developer trying to drive it through APIs, its a nightmare!
+Visual Studio App center (VSAC) is great! It virtually eliminates the humongous
+effort it usually requires to setup a DevOps pipeline. As an end user, I am
+completely satisfied with what is on offer. As a developer trying to drive it
+through APIs, its a nightmare!
 
-Why a nightmare?  
-It's because it had me stuck on a problem for upto 2 days that would have never risen had there been proper documentation available. Albeit, they do have a swagger notation website ([here](https://openapi.appcenter.ms/)) which attempts to extensively document all aspects of rest APIs available. The platform is still in its incessant development stage. I hope the documentation will become better with time.
+**Why a nightmare?**
+It's because it had me stuck on a problem for upto 2 days that would have never
+risen had there been proper documentation available. Albeit, they do have a
+swagger notation website ([here](https://openapi.appcenter.ms/)) which attempts
+to extensively document all aspects of rest APIs available. The platform is still
+in its incessant development stage. I hope the documentation will become better
+with time.
 
-Pro tip : Read the swagger notation in JSON and not the UI. The UI rendered leaves out a lot of information. I suggest leveraging [Json Editor Online](https://jsoneditoronline.org/) to make it human readable.
+Pro tip : Read the swagger notation in JSON and not the UI. The UI rendered
+leaves out a lot of information. I suggest leveraging
+[Json Editor Online](https://jsoneditoronline.org/) to make it human readable.
 
-This post aims to guide on executing Espresso tests on VSAC using rest APIs. As of writing this post, the API version is tagged `v0.1`.
+This post aims to guide on executing Espresso tests on VSAC using rest APIs.
+As of writing this post, the API version is tagged `v0.1`.
 
 This article assumes you have carried out the following basic steps:
+
 - Creating a user account;
 - Creating an organization;
 - Either signing up for a trial or have premium access to VSAC;
 
-#### **Creating a test series**
-A test series is a logical group that holds certain UI tests. They are used to define the nature of UI tests that are executed under this group. To create a new test series, execute the following:
+## Creating a test series
+
+A test series is a logical group that holds certain UI tests. They are used to
+define the nature of UI tests that are executed under this group. To create a
+new test series, execute the following:
 
 ```javascript
 POST https://api.appcenter.ms/v0.1/apps/<organization_name>/<application_name>/test_series
@@ -35,13 +52,22 @@ Body (application/json):
 { name: <test_series_name> }
 
 Example Response:
-{ "name": "Master New", "slug": "master-new", "mostRecentActivity": "2018-06-09T13:19:23.395Z", "testRuns": [] }
+{
+    "name": "Master New",
+    "slug": "master-new",
+    "mostRecentActivity": "2018-06-09T13:19:23.395Z",
+    "testRuns": []
+}
 ```
 
-The API will generate a `slug` for your test-series. This `slug` is used to refer to this test-series in suceeding calls.
+The API will generate a `slug` for your test-series. This `slug` is used to
+refer to this test-series in suceeding calls.
 
-#### **Get test series**
-Check if the newly created series reflects on requesting for the entire set. This API may also be used to get the number of tests executed per test-series and their results.
+## Get test series
+
+Check if the newly created series reflects on requesting for the entire set.
+This API may also be used to get the number of tests executed per test-series
+and their results.
 
 ```javascript
 GET https://api.appcenter.ms/v0.1/apps/<organization_name>/<application_name>/test_series
@@ -75,14 +101,19 @@ Example Response:
 ]
 ```
 
-Executing tests on VSAC is a four step process.
-- **First** 	: Creating a test run. This creates a `test_run_id` for you. Every `test_run_id` has a state which may be retrieved from `/state` end point.
-- **Second**	:  Creating file hashes. This API is to intimate VSAC that you wish to upload APKs for testing. For the platform to accept an upload, it needs to know the `SHA-1` hashes of the files. 
-- **Third**		: Uploading the APKs as a `multipart/form-data`
-- **Fourth**	: Executing the test
+## Executing tests on VSAC is a four step process
+
+- **First**: Creating a test run. This creates a `test_run_id` for you. Every
+`test_run_id` has a state which may be retrieved from `/state` end point.
+- **Second**:  Creating file hashes. This API is to intimate VSAC that you wish
+to upload APKs for testing. For the platform to accept an upload, it needs to
+know the `SHA-1` hashes of the files. 
+- **Third**: Uploading the APKs as a `multipart/form-data`
+- **Fourth**: Executing the test
 
 
-#### **First : Create a new test run**
+### First : Create a new test run
+
 ```javascript
 POST https://api.appcenter.ms/v0.1/apps/<organization_name>/<application_name>/test_runs
 
@@ -96,23 +127,31 @@ Headers :
 location →/v0.1/apps/{application_id}/test_runs/<test_run_id>
 ```
 
-Notice the API does not respond with any body, neither the usual 200 HTTP status code. Instead, you receieve a [201 HTTP statuscode](https://httpstatuses.com/201).
+Notice the API does not respond with any body, neither the usual 200 HTTP status
+code. Instead, you receieve a [201 HTTP statuscode](https://httpstatuses.com/201).
 
-#### **Second: Creating file hashes** 
-To create a file hash, ensure you have successfully generated 2 APK files - Build APK & an Android test APK that contains your Espresso test cases. To do that, navigate to your Android project and execute the following:
-```javascript
+### Second: Creating file hashes
+
+To create a file hash, ensure you have successfully generated 2 APK files -
+Build APK & an Android test APK that contains your Espresso test cases. To do
+that, navigate to your Android project and execute the following
+
+```sh
 $ ./gradlew assembleDebug assembleAndroidTest
 ```
 
-The APKs will be generated in `app/build/` folder. To find the `SHA-1` hash, navigate to each of the folder that contains your APKs and execute:
+The APKs will be generated in `app/build/` folder. To find the `SHA-1` hash,
+navigate to each of the folder that contains your APKs and execute:
 
-```javascript
+```sh
 $ shasum <file-name>.apk
 
+# Example output
 4eb758d8d46da4711bb814ce6e6099c696411111  <file-name>.apk
 ```
 
-On executing each of the commands, the terminal will print a cryptic value. These values will be used in the `/hashes/batch` API. 
+On executing each of the commands, the terminal will print a cryptic value.
+These values will be used in the `/hashes/batch` API.
 
 ```javascript
 POST https://api.appcenter.ms/v0.1/apps/<organization_name>/<application_name>/test_runs/<test_run_id>/hashes/batch
@@ -159,8 +198,11 @@ Example Response:
 ]
 ```
 
-#### **Third: Uploading the APKs** 
-The response of `/hashes/batch` API carries a `location` key for each of the files for which hashes have been submitted. This is the URL where the respective APKs need to be uploaded. Ensure you upload each APK to their respective URLs.
+### Third: Uploading the APKs
+
+The response of `/hashes/batch` API carries a `location` key for each of the
+files for which hashes have been submitted. This is the URL where the respective
+APKs need to be uploaded. Ensure you upload each APK to their respective URLs.
 
 ```javascript
 POST https://testcloud.xamarin.com/v0.1/direct_uploads?token=<VSAC_generated_token_here>
@@ -179,10 +221,15 @@ Response:
 HTTP Status Code : 201 Created
 ```
 
-If you get HTTP status code 201 as a response for each of the files, you are set to execute your test cases. 
+If you get HTTP status code 201 as a response for each of the files, you are set
+to execute your test cases. 
 
-#### **Fourth: Execute the test case**
-To execute a test case, you need to specify which devices the test should run on. To create a new device set, please refer VSAC's swagger page. I created a set from the portal. To specify a device, you need a `device_slug` retrieved by `/device_sets` end point.
+### Fourth: Execute the test case
+
+To execute a test case, you need to specify which devices the test should run on.
+To create a new device set, please refer VSAC's swagger page. I created a set
+from the portal. To specify a device, you need a `device_slug` retrieved by
+`/device_sets` end point.
 
 ```javascript
 GET https://api.appcenter.ms/v0.1/apps/<organization_name>/<application_name>/owner/device_sets
@@ -213,7 +260,8 @@ Example response :
 ]
 ```
 
-With a test run created, APK files uploaded & a `device_slug` retrieved, we are ready to execute it on Appcenter's devices! 
+With a test run created, APK files uploaded & a `device_slug` retrieved, we are
+ready to execute it on Appcenter's devices! 
 
 ```javascript
 POST https://api.appcenter.ms/v0.1/apps/<organization_name>/<application_name>/test_runs/<test_run_id>/start
@@ -241,9 +289,12 @@ Example Response:
 }
 ```
 
-If you receieve a similar response from VSAC, congratulations! You have successfully executed your UI test case through REST APIs! To confirm, you may execute `/state` API or simply head over to VSAC to have a visual confirmation.
+If you receieve a similar response from VSAC, congratulations! You have
+successfully executed your UI test case through REST APIs! To confirm, you may
+execute `/state` API or simply head over to VSAC to have a visual confirmation.
 
-![VSAC Visual confirmation]({{ site.url }}/assets/img/VSAC_Test_run.png)
+![VSAC Visual confirmation](/assets/img/VSAC_Test_run.png)
 
+#### Update Log
 
-update 10th June : Added `device_sets` API
+1. 10th June : Added `device_sets` API

@@ -1,27 +1,48 @@
 ---
-layout: post
 title: "Route PiVPN client traffic via Mullvad"
+author: ArcherN9
+date: 2020-06-28 14:23:21 +0000
 description: "Setup a Raspberry Pi as a central VPN hub to route PiVPN traffic via Mullvad"
-category: articles
-tags: [Mullvad, PiVPN, Wireguard, IPTables, Routing, Networking, DietPi, RaspberryPiOS, RaspberryPi]
+category: [Linux]
+tags: [Mullvad, PiVPN, Wireguard, IPTables, Routing, Networking, RaspberryPi, Linux]
 ---
 
-This post attempts to respond to enigmas similar to "How do I route my PiVPN traffic through a commercial VPN?". By the end of this guide, you should have:
+*Note: As of July 2021, this post is still accurate. However, considering
+iptables has been deprecated and replacd with nftables (I think?), I plan to
+re-write this post in the near future. In case it doesn't, check the About Me
+section to get in touch with me.*
+
+This post attempts to respond to enigmas similar to "How do I route my PiVPN
+traffic through a commercial VPN?". By the end of this guide, you should have:
+
 * A working PiVPN installation; (With Wireguard)
-* A Mullvad VPN (With Wireguard) setup for use on multiple devices - Beyond the five client limit imposed by their system
+* A Mullvad VPN (With Wireguard) setup for use on multiple devices - Beyond the
+* five client limit imposed by their system
 
-I have used a fresh installation of DietPi on a Raspberry Pi Zero W (henceforth referred to as DietPi) for this guide. The setup process is similar for all other RaspberryPis and Raspberry Pi OS.
+I have used a fresh installation of DietPi on a Raspberry Pi Zero W (henceforth
+referred to as DietPi) for this guide. The setup process is similar for all other
+RaspberryPis and Raspberry Pi OS.
 
-Note: This guide assumes you're aware of PiVPN & its uses, have it installed on the system and it functions as intended. For more information, I suggest going through threads on Reddit and the official website first.
+*Note: This guide assumes you're aware of PiVPN & its uses, have it installed on
+the system and it functions as intended. For more information, I suggest going
+through threads on Reddit and the official website first.*
 
 ## Step One: Verify ipv4 packet forwarding is enabled
-IP forwarding is synonymous with routing and seldom referred to as 'kernel IP forwarding' because it is a feature of the Linux kernel. A router has multiple network interfaces; If traffic comes in from one interface that matches a subnet of another network interface, a router then forwards that traffic to the other network interface. This functionality is achieved by enabling ipv4 forwarding on non-router devices. Refer [this][1] for more information on this property.
 
-**Pro Tip**: Updating the value of `net.ipv4.ip_forward` in `/proc/sys/net/ipv4` is a temporary gambit. I suggest using `sysctl` instead.
+IP forwarding is synonymous with routing and seldom referred to as 'kernel IP
+forwarding' because it is a feature of the Linux kernel. A router has multiple
+network interfaces; If traffic comes in from one interface that matches a subnet
+of another network interface, a router then forwards that traffic to the other
+network interface. This functionality is achieved by enabling ipv4 forwarding on
+non-router devices. Refer [this][1] for more information on this property.
 
-Check for the current ipv4 forwarding value; PiVPN enables it during installation; In my experience, it does not sustain system reboots.
+**Pro Tip**: Updating the value of `net.ipv4.ip_forward` in `/proc/sys/net/ipv4`
+is a temporary gambit. I suggest using `sysctl` instead.
 
-```
+Check for the current ipv4 forwarding value; PiVPN enables it during installation;
+In my experience, it does not sustain system reboots.
+
+```sh
 $ sudo sysctl net.ipv4.ip_forward
 net.ipv4.ip_forward = 1
 $ sudo sysctl -w net.ipv4.ip_forward=1
@@ -29,9 +50,11 @@ net.ipv4.ip_forward = 1
 ```
 
 ## Step Two: Creation of Mullvad Wireguard interfaces
-To create Mullvad Wireguard interfaces, we need to download the Mullvad Wireguard configuration file. Refer [this guide][2] but follow the steps below:
 
-```
+To create Mullvad Wireguard interfaces, we need to download the Mullvad Wireguard 
+configuration file. Refer [this guide][2] but follow the steps below:
+
+```sh
 # This adds the Wireguard PPA repository to the system so Wireguard interfaces may be downloaded from the repository.
 $ sudo add-apt-repository ppa:wireguard/wireguard
 
@@ -45,14 +68,20 @@ $ cd /etc/wireguard && mkdir mullvad-config && cd mullvad-config
 $ curl -LO https://mullvad.net/media/files/mullvad-wg.sh
 
 # Use an editor of your choice to include PostUp and PreDown sections to the script
-$ nano mullvad-wg.sh
+$ nano mullvad-wg.sh # Update Jul 2021: In hindsight, I wonder why did I use nano and not Neovim.
 ```
 
-I suggest you read through the mullvad-wg.sh shell script to better understand the purpose. In the editor, search for the line that reads `DNS="193.138.218.74"` and replace it with `DNS="x.x.x.x"` where `x.x.x.x` is your DietPi's LAN IP. In my case, I set it up as `DNS="192.168.1.100"`
+I suggest you read through the mullvad-wg.sh shell script to better understand
+the purpose. In the editor, search for the line that reads `DNS="193.138.218.74"`
+and replace it with `DNS="x.x.x.x"` where `x.x.x.x` is your DietPi's LAN IP. In
+my case, I set it up as `DNS="192.168.1.100"`
 
-The **for** loop that succeeds *"Writing WireGuard configuration files"* is responsible for creating individual Wireguard configuration files to connect to Mullvad. Refer [this video][3] for more information on **iptables** & modify the section:
+The **for** loop that succeeds *"Writing WireGuard configuration files"* is
+responsible for creating individual Wireguard configuration files to connect to
+Mullvad. Refer [this video][3] for more information on **iptables** & modify the
+section:
 
-```
+```sh
 ...
 for CODE in "${SERVER_CODES[@]}"; do
         CONFIGURATION_FILE="/etc/wireguard/mullvad-$CODE.conf"
@@ -97,19 +126,25 @@ for CODE in "${SERVER_CODES[@]}"; do
 done
 ...
 ```
-Note: Ports from Mullvad may be opened [here](https://mullvad.net/en/account/#/ports). Save the script, exit and execute.
+Note: Ports from Mullvad may be opened
+[here](https://mullvad.net/en/account/#/ports). Save the script, exit and
+execute.
 
-```
+```sh
 $ chmod +x mullvad-wg.sh
 $ ./mullvad-wg.sh
 ```
 
-If you receive *"Please wait up to 60 seconds for your public key to be added to the servers."* as the final output, it would imply your wireguard configurations have been generated. Execute `ls -lsa` in `/etc/wireguard` directory to confirm.
+If you receive *"Please wait up to 60 seconds for your public key to be added to
+the servers."* as the final output, it would imply your wireguard configurations
+have been generated. Execute `ls -lsa` in `/etc/wireguard` directory to confirm.
 
 ## Step Three: Creation of pivpn table
-To satisfy the parameters added to `PostUp` section in Mullvad configurations and for them to function correctly, we shall create the pivpn routing table.
 
-```
+To satisfy the parameters added to `PostUp` section in Mullvad configurations
+and for them to function correctly, we shall create the pivpn routing table.
+
+```sh
 $ cd /etc/iproute2
 $ nano rt_tables
 # reserved values
@@ -128,9 +163,11 @@ $ nano rt_tables
 ```
 
 ## Step Four: Verifying newly created Mullvad interfaces
-Navigate to `/etc/wireguard` and verify if a random Mullvad interface functions as intended.
 
-```
+Navigate to `/etc/wireguard` and verify if a random Mullvad interface functions
+as intended.
+
+```sh
 $ cd /etc/wireguard
 $ wg-quick up mullvad-ch4.conf
 
@@ -157,9 +194,10 @@ $ wg-quick up mullvad-ch4.conf
 
 ```
 
-If you see an output similar to the above, you have successfully connected to Mullvad. Just to be sure, test the conection.
+If you see an output similar to the above, you have successfully connected to
+Mullvad. Just to be sure, test the conection.
 
-```
+```sh
 $ ip a
 ...
 6: mullvad-ch4: <POINTOPOINT,NOARP,UP,LOWER_UP> mtu 1420 qdisc noqueue state UNKNOWN group default qlen 1000
@@ -178,7 +216,7 @@ $ wg-quick down wg0
 
 ## Step Five: Add a FwMark to packets incoming from PiVPN
 
-```
+```sh
 $ cd /etc/wireguard
 $ nano wg0.conf
 
@@ -193,7 +231,7 @@ FwMark = 51820
 
 Bump both of the interfaces.
 
-```
+```sh
 $ cd /etc/wireguard
 # Enable PiVPN
 $ wg-quick up wg0
@@ -203,15 +241,18 @@ $ wg-quick up mullvad-dk2.conf
 ```
 
 ## Step Six: Verify functionality on a client device
+
 If the PiVPN client has a terminal, access it and use `curl` to verify:
-```
+
+```sh
 $ curl https://am.i.mullvad.net/connected
 You are connected to Mullvad (server dk2-wireguard). Your IP address is 45.129.56.201
 ```
 
-Or open a browser, navigate to `https://duckduckgo.com/` and search for "ip address".
+Or open a browser, navigate to `https://duckduckgo.com/` and search for "ip
+address".
 
-![IP Address confirmation]({{ site.url }}/assets/img/mullvad_ipaddress.png)
+![IP Address confirmation](/assets/img/mullvad_ipaddress.png)
 
 [1]: https://unix.stackexchange.com/questions/14056/what-is-kernel-ip-forwarding
 [2]: https://mullvad.net/en/help/wireguard-and-mullvad-vpn/
