@@ -4,6 +4,10 @@ source "https://rubygems.org"
 
 gemspec
 
+group :test do
+  gem "html-proofer", "~> 3.18"
+end
+
 # This will help ensure the proper Jekyll version is running.
 # Happy Jekylling!
 gem "jekyll", "~> 4.2.0"
