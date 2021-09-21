@@ -45,8 +45,7 @@ For me, it was bullet #1 and also to affirm myself that I could do such at thing
 * A fresh headless [Diet Pi][7] v7.4.2 build ID
 \#140fa04 (dated: 13th September 2021) for ARM-v6 installation
 * RaspberryPi Zero W (henceforth referred to as Pi)
-* `CONFIG_ENABLE_IPV6` is set to `0`; I wish to avoid complexities arising out
-of supporting IPv6 as I do not understand it yet.
+* `CONFIG_ENABLE_IPV6` is set to `1`; My router is an IPv6 only connection.
 * DietPi Linux kernel: 5.10.52+
 * Wireguard Version:
 ```sh
@@ -68,7 +67,7 @@ system.*
 SSH into your Pi and execute:
 
 ```sh
-$ sudo apt install wireguard resolvconf nftables git qrencode
+$ sudo apt install wireguard nftables git qrencode curl jq openresolv
 # apt should install a few packages automatically. If not, install them
 # manually: libedit2 libjansson4 libnftables1 libnftnl11
 ```
@@ -86,8 +85,8 @@ $ wg
 ```
 
 *Note: Additionally, I took the liberty to setp NeoVim editor using my [DotFiles][9].
-It does not directly impact the end result yielded from this guide. Also, by no means
-am I an expert at this. I followed an excellent guide myself, [here][10]*
+It does not directly impact the end result yielded from this guide. By no means
+am I an expert with Wireguard. I followed an excellent guide myself, [here][10]*
 
 Create a private, and public key for the server.
 
@@ -122,8 +121,8 @@ file titled `wg0.conf`
 # The key below is just a placeholder. Use your own.
 PrivateKey = gK48mAIwIF0sMYXPWWkErZ2+Ofh/p7tv6UyhljiHX1g=
 
-# This is the server address on the wireguard interface
-Address = 10.6.0.1/24
+# This is the server address on the wireguard interface using ipv4 and ipv6
+Address = 10.6.0.1/24, fd00:43:43::1/64
 
 # The port on which Wireguard listens for connections
 ListenPort = 51820
@@ -140,8 +139,8 @@ PublicKey = DL6qKIOuU2tG4KKqSlMdKwDkSaOv6HM8YSPAr3XHnk8=
 
 # The allowed IPs section declares the IP address of the client. A client may
 # connect to this interface using the declared wireguard public key only if
-# they accept the following IP address on their interface.
-AllowedIPs = 10.6.0.2/24
+# they declare the following IP address on their interface.
+AllowedIPs = 10.6.0.2/24, fd00:43:43::2/64
 ```
 With the configuration setup, its time to enable this interface.
 
@@ -155,12 +154,15 @@ $ wg-quick up wg0
 [#] ip link add wg0 type wireguard
 [#] wg setconf wg0 /dev/fd/63
 Warning: AllowedIP has nonzero host part: 10.6.0.2/24
+Warning: AllowedIP has nonzero host part: fd00:43:43::2/64
 [#] ip -4 address add 10.6.0.1/24 dev wg0
+[#] ip -6 address add fd00:43:43::1/64 dev wg0
 [#] ip link set mtu 1420 up dev wg0
 ```
 
 To verify proper functionality of the wireguard interface, we execute the `wg` command
 once again:
+
 ```sh
 $ wg
 interface: wg0
@@ -169,23 +171,23 @@ interface: wg0
   listening port: 51820
 
 peer: DL6qKIOuU2tG4KKqSlMdKwDkSaOv6HM8YSPAr3XHnk8=
-  allowed ips: 10.6.0.0/24
+  allowed ips: 10.6.0.0/24, fd00:43:43::/64
 ```
 Note that there are no connected clients to this interface right now. For easier
 client management, create a folder `clients` inside `/etc/wireguard` and create
 multiple conf files for each client. An example of `ArchS9.conf` is below.
 ```sh
 [Interface]
-
 # The assigned IP address to the client on the wireguard interface
-Address = 10.6.0.2/24
+Address = 10.6.0.2/24, fd00:43:43::2/64
 
 # I'm not entirely sure of this property; If I had to guess, this is the port
 # of origin for client requests.
 ListenPort = 51820
 
-# The private key of the client | This can be generated on the server or the client
-PrivateKey = 4PNI4355DR6F8y3CsxTnxTWVKzt9lTLqEznmL+8FSVo=
+# The private key of the client | This can be generated on the server or the
+# client
+PrivateKey = APceeHUY519mhG8rjvQU5UafRfa8NYS1ySMqCJhmHE0=
 
 # The DNS to be used on the client. It should correspond to the Wireguard Server
 # if it also runs unbound, PiHole or equivalent; A local (Local to the server)
@@ -194,29 +196,31 @@ PrivateKey = 4PNI4355DR6F8y3CsxTnxTWVKzt9lTLqEznmL+8FSVo=
 # Routing rules have been defined. Since we have not, we keep the DNS value
 # to the server's Wireguard interface - regardless of availability of a DNS
 # Server on that IP or not.
-DNS = 10.6.0.1
+DNS = 10.6.0.1, fd00:43:43::1
 
 [Peer]
+
 # Public Key of the sever; Import from the server_public_key file created earlier.
-PublicKey = ZGMDXHJBEEFn9pLK8wpeFeEf2bidHek/kdImW56L9Xs= 
+PublicKey = ZGMDXHJBEEFn9pLK8wpeFeEf2bidHek/kdImW56L9Xs=
+
 # The client will only connect to a server against the declared Public key
 # if the allotted IP address is within the subnet range identified below.
-AllowedIPs = 10.6.0.0/24
+AllowedIPs = 10.6.0.0/24, fd00:43:43::1
 
 # The server endpoint. For anyone who is running their Wireguard servers behind
 # a dynamic IP address, creation of a domain is recommended. Ex: htps://noip.com
+# using A or AAA records for Ipv4 or IPv6 resolution
 # This also warrants creation of an IP forwarding rule on your NAT if there is one.
 # The topic is beyond the scope of this guide.
-Endpoint = archer.noip.com:51820
+Endpoint = [MY-IPV6-ADDRES-WAS-HERE]:51820
 ```
-
 ## Step Three: Configure the client device & Test connectivity
 
 With a client configuration generated on the server, we need to import it to
 a client device. I'm using my Samsung Galaxy S9 and the [Wireguard Android App][12]
 to achieve this. The Wireguard app is capable of importing configurations via
 a QR code as well. To make use of this feature, we need to go back to the Wireguard
-server and generate a QR code to read.
+server and generate a QR code.
 
 ```sh
 $ cd /etc/wireguard/clients
@@ -229,12 +233,13 @@ $ qrencode -t ANSIUTF8 < ArchS9.conf
 Depending on where the Wireguard server is being setup and whether access to
 a desktop environment is available or not, we either print the QRCode on the
 terminal itself or as a file to be accessed via something like [feh][13]. I'm
-embarassed to admit this but since my setup was on a headless temporary PiZero,
-and the qrencode output is a behemoth image, I found it very difficult to import
-the png file to my ArchLinux daily driver. Quick fixes with `scp` failed &
-alterantives like creating an FTP server with [proftpd][14] seemed overkill.
-I resorted to zooming out my terminal to fit the qrcode within the display bounds
-and scanning it via the Wireguard Android app. Not a very techy fix but it works.
+embarassed to admit this but since my setup was on a headless temporary PiZero with
+a terminal that does not easily zoom in or out and the qrencode output is a behemoth
+image, I found it very difficult to import the png file to my ArchLinux daily driver.
+Quick fixes with `scp` failed & alterantives like creating an FTP server with
+[proftpd][14] seemed overkill. I resorted to zooming out my terminal to fit the
+qrcode within the display bounds and scanning it via the Wireguard Android app.
+Not a very techy fix but it works.
 
 With the configuration imported the Android app, use the switch to enable
 interface and notice the `Rx` and `Tx` values dynamically change; They serve
@@ -250,9 +255,9 @@ interface: wg0
   listening port: 51820
 
 peer: DL6qKIOuU2tG4KKqSlMdKwDkSaOv6HM8YSPAr3XHnk8=
-  endpoint: 192.168.1.6:51820
-  allowed ips: 10.6.0.0/24
-  latest handshake: 1 minute, 24 seconds ago
+  endpoint: [MY-CLIENT-IPV6-ADDRESS]:51820
+  allowed ips: 10.6.0.0/24, fd00:43:43::/64
+  latest handshake: 4 seconds ago
   transfer: 28.72 KiB received, 14.25 KiB sent
 ```
 
@@ -276,73 +281,83 @@ flush ruleset
 # But was unable to. If you have a better understanding of nftables and
 # comprehend how this configuration can be broken apart into multiple tables,
 # drop me an email!
-table ip pinhole_filter {
+table inet pinhole_filter {
 
-    # allow all packets sent by Pi itself to the outside world
+    # allow all packets sent by Pi to the outside world
     chain output {
-        type filter hook output priority 100; policy accept;
+        type filter hook output priority 0; policy accept;
     }
 
-    # This is the default base chain for input | all incoming traffic
-    # Enters this
+    # This is the default base chain for inpuj
     chain default_input {
 
         # Blanket policy to drop all incoming packets unless specified below
         type filter hook input priority 0; policy drop;
 
-        # If a connection was requested by Pi itself, let it pass
+        # If a connection was requested by Pi itself and established, let it pass
         ct state { established, related } counter accept comment "Accept connections made by the Pi itself"
 
         # Perhaps an overkill but if the protocol is an ICMP request, route it to a non base chain
-        ip protocol icmp goto icmp_filter
+        meta l4proto icmp goto icmp_filter
+        ip6 nexthdr icmpv6 goto icmp_filter
 
-        # We segregate packets based on their origin. If a packet is being received from the wlan0 interface,
-        # Route it to the wlan0_filter chain for further processing
+        # Accept everything originating from loopback
+        iifname "lo" accept
+
+        # We segregate packets based on their origin interface. If a packet is
+        # is received on the wlan0 interface, route it to the wlan0_filter
+        # chain for further processing
         iifname "wlan0" jump wlan0_filter
-        # Similarly, if the packet originated from wg0, we process it in this chain
+
+        # Similarly, if the packet was received from wg0, we process it in
+        # wg0_filter chain
         iifname "wg0" jump wg0_filter
     }
 
-    # The ICMP chain. This is a non-base chain that gets executed on the protocol
-    # being matched.
+    # The ICMP chain for bothm ipv4 and ipv6 packets
     chain icmp_filter {
 
-        # Accept ICMP requests
-        ip protocol icmp iifname "wlan0" ip saddr 192.168.1.2-192.168.1.254 counter accept comment "Accept ICMP requests originating from LAN. But not the router"
+        # Accept ICMP requests on ipv4
+        meta l4proto icmp iifname { "wlan0", "wg0" } ip saddr { 192.168.1.0/24, 10.6.0.0/29 } counter accept comment "icmpv4 : LAN & Wireguard"
+
+         # Accept ICMPv6 requests on ipv6
+        meta l4proto icmpv6 iifname { "wlan0", "wg0" } ip6 saddr { fe80::/112, fd00:43:43::/64 } ip6 daddr { ff02::/112, fe80::/112, 2401:4900::/96, fd00:43:43::/64 } counter accept comment "icmpv6: lo & Wireguard"
+
+        # accept neighbour discovery otherwise IPv6 connectivity breaks
+        # Refer: https://www.computernetworkingnotes.com/networking-tutorials/ipv6-neighbor-discovery-protocol-explained.html
+        icmpv6 type { nd-neighbor-solicit, nd-router-advert, nd-neighbor-advert } accept
     }
 
-    # All queries received on the wlan0 interface that have not already been
-    # catered to are received and processed here.
+    # The wlan0 chain allows us to specify pin hole rules for ports / services
+    # That are received on the wlan0 interface
     chain wlan0_filter {
 
         # Accept SSH requests from wlan0
-        tcp dport 22 counter accept comment "Accept Packets from Service: SSH"
+        tcp dport 22 counter accept comment "Accept: SSH"
 
         # Accept Wireguard connection requests
         udp dport 51820 counter accept comment "Accept connection requests: Wireguard"
+
+        # Plex has a bad habit of flooding the broadcast address. Block packets originating
+        # From plex
+        # Note: This is not really required since the base policy is to drop
+        # everything that is not allowed specifically. These entries are added
+        # explicitly to help identify these ports in the future
+        udp dport { 32414, 32412 } drop
     }
 
-    # All queries received on the wg0 interface that have not already been
-    # catered to are received and processed here.
+    # The wlan0 chain allows us to specify pin hole rules for ports / services
+    # That are received on the wg0 interface
     chain wg0_filter {
 
         # Accept SSH requests
-        tcp dport 22 counter accept comment "Accept Packets from Service: SSH"
+        tcp dport 22 counter accept comment "Accept: SSH"
+        udp dport 53 counter accept comment "Accept: DNS"
     }
 }
 ```
 
-The above configuration looks cryptic but is not really. It configures NetFilter
-to do the following:
-
-1. Accept ICMP requests on wlan0 interface for all LAN IPs except from the router
-itself.
-2. Accept incoming packets if the connection was established by Pi
-3. Accept packets on port 22 and 51820 if originating from wlan0
-4. Accept packets on port 22 if originating from wg0
-5. Drop everything else
-
-## Step Five: Verify ipv4 packet forwarding is enabled
+## Step Five: Verify ipv4 and ipv6 packet forwarding is enabled
 
 So far, we've only established connectivity between the wireguard server and the
 client. The most we can do at the moment is ping the Pi from our Android [Termux][15].
@@ -350,87 +365,47 @@ IP forwarding is synonymous with routing and seldom referred to as 'kernel IP
 forwarding' because it is a feature of the Linux kernel. A router has multiple
 network interfaces; If traffic comes in from one interface that matches a subnet
 of another network interface, a router then forwards that traffic to the other
-network interface. This functionality is achieved by enabling ipv4 forwarding on
-non-router devices. Refer [this][17] for more information on this property.
+network interface. This functionality is achieved by enabling ipv4 & ipv6 forwarding
+on non-router devices. Refer [this][17] for more information on this property.
 
-**Pro Tip**: Updating the value of `net.ipv4.ip_forward` in `/proc/sys/net/ipv4`
-is a temporary gambit. I suggest using `sysctl` instead.
+**Pro Tip**: Updating the value of `net.ipv4.ip_forward` and
+`net.ipv6.conf.all.forwarding` in `/proc/sys/net/ipv4` is a temporary gambit.
+I suggest using `sysctl` instead.
 
 ```sh
 # Check the current value; It should be zero since its a fresh install.
 $ sysctl net.ipv4.ip_forward
 net.ipv4.ip_forward = 0
+$ net.ipv6.conf.all.forwarding
+net.ipv6.conf.all.forwarding = 0
 
 # We overrite the current property with 1 to enable it
-$ sysctl --write net.ipv4.ip_forward=1
+$ sysctl --write net.ipv4.ip_forward = 1
 net.ipv4.ip_forward = 1
-```
-## Step Six: Setup Pi with NAT routing
-
-eturn to the `/etc/wireguard/` directory and edit `wg0.conf` to incorporate the
-new sections identified by `#NEW` tag.
-
-```sh
-[Interface]
-# The Private key is from the server_private_key file created above
-# The key below is just a placeholder. Use your own.
-PrivateKey = gK48mAIwIF0sMYXPWWkErZ2+Ofh/p7tv6UyhljiHX1g=
-
-# This is the server address on the wireguard interface
-Address = 10.6.0.1/24
-
-# The port on which Wireguard listens for connections
-ListenPort = 51820
-
-# Multiple Peer blocks can be added depending on how many peers want to connect
-# to this server. For now, we declare just one
-[Peer]
-
-# The public key of the wireguard client - Could be another desktop, Linux system
-# or a handheld device. The process to create keys on the client largely remain
-# the same. Figure out a way to import the public key generated on the client to
-# this file. Also, the key below is just a placeholder. Use your own.
-PublicKey = DL6qKIOuU2tG4KKqSlMdKwDkSaOv6HM8YSPAr3XHnk8=
-
-# The allowed IPs section declares the IP address of the client. A client may
-# connect to this interface using the declared wireguard public key only if
-# they accept the following IP address on their interface.
-AllowedIPs = 10.6.0.2/24
+$ sysctl --write net.ipv6.conf.all.forwarding = 1
+net.ipv6.conf.all.forwarding = 1
 ```
 
-========================= OLD POST =========================
+## Step Six: Creation of Mullvad Wireguard interfaces
 
-## Step Two: Creation of Mullvad Wireguard interfaces
-
-To create Mullvad Wireguard interfaces, we need to download the Mullvad Wireguard 
-configuration file. Refer [this guide][2] but follow the steps below:
+To create Mullvad Wireguard interfaces for each of the servers they provide,
+download the Mullvad Wireguard configuration file. Refer [this guide][18] but
+follow the steps below:
 
 ```sh
-# This adds the Wireguard PPA repository to the system so Wireguard interfaces may be downloaded from the repository.
-$ sudo add-apt-repository ppa:wireguard/wireguard
-
-# This installs some dependencies required to execute the Mullvad shell script that we'll use later
-$ sudo apt-get install curl jq resolvconf raspberrypi-kernel-headers wireguard-dkms wireguard-tools
-
 # This step is a stow-away suggestion and archival for the script
 $ cd /etc/wireguard && mkdir mullvad-config && cd mullvad-config
 
 # Downloads the Mullvad Wireguard interface creation shell script. We shall modify this to our use case
 $ curl -LO https://mullvad.net/media/files/mullvad-wg.sh
-
-# Use an editor of your choice to include PostUp and PreDown sections to the script
-$ nano mullvad-wg.sh # Update Jul 2021: In hindsight, I wonder why did I use nano and not Neovim.
 ```
 
 I suggest you read through the mullvad-wg.sh shell script to better understand
-the purpose. In the editor, search for the line that reads `DNS="193.138.218.74"`
-and replace it with `DNS="x.x.x.x"` where `x.x.x.x` is your DietPi's LAN IP. In
-my case, I set it up as `DNS="192.168.1.100"`
+the purpose. 
 
 The **for** loop that succeeds *"Writing WireGuard configuration files"* is
 responsible for creating individual Wireguard configuration files to connect to
-Mullvad. Refer [this video][3] for more information on **iptables** & modify the
-section:
+Mullvad. 
 
 ```sh
 ...
@@ -489,6 +464,42 @@ $ ./mullvad-wg.sh
 If you receive *"Please wait up to 60 seconds for your public key to be added to
 the servers."* as the final output, it would imply your wireguard configurations
 have been generated. Execute `ls -lsa` in `/etc/wireguard` directory to confirm.
+
+## Step Seven: Setup Pi with NAT routing
+
+Return to the `/etc/wireguard/` directory and edit `wg0.conf` to incorporate the
+new sections identified by `#NEW` tag.
+
+```sh
+[Interface]
+# The Private key is from the server_private_key file created above
+# The key below is just a placeholder. Use your own.
+PrivateKey = gK48mAIwIF0sMYXPWWkErZ2+Ofh/p7tv6UyhljiHX1g=
+
+# This is the server address on the wireguard interface
+Address = 10.6.0.1/24
+
+# The port on which Wireguard listens for connections
+ListenPort = 51820
+
+# Multiple Peer blocks can be added depending on how many peers want to connect
+# to this server. For now, we declare just one
+[Peer]
+
+# The public key of the wireguard client - Could be another desktop, Linux system
+# or a handheld device. The process to create keys on the client largely remain
+# the same. Figure out a way to import the public key generated on the client to
+# this file. Also, the key below is just a placeholder. Use your own.
+PublicKey = DL6qKIOuU2tG4KKqSlMdKwDkSaOv6HM8YSPAr3XHnk8=
+
+# The allowed IPs section declares the IP address of the client. A client may
+# connect to this interface using the declared wireguard public key only if
+# they accept the following IP address on their interface.
+AllowedIPs = 10.6.0.2/24
+```
+
+========================= OLD POST =========================
+
 
 ## Step Three: Creation of pivpn table
 
@@ -613,6 +624,13 @@ Though not mandatory, I do suggest sparing sometime to read through the followin
 documentation for a better comprehension of a lot of concepts used above:
 
 1. [IP Routing Explained *by NetworkLessons.com*](https://networklessons.com/cisco/ccna-routing-switching-icnd1-100-105/ip-routing-explained)
+2. [Configuring Chains *by nftables official wiki*](https://wiki.nftables.org/wiki-nftables/index.php/Configuring_chains)
+3. [Man Page *by nftables official man page*](https://www.netfilter.org/projects/nftables/manpage.html)
+4. [nftables experiments with ICMP *by a02*](https://ao2.it/en/blog/2018/04/27/nftables-experiments-icmpv6-hop-hop-options-header)
+5. [Beginners guide to traffic filtering *by limnux-audit*](https://linux-audit.com/nftables-beginners-guide-to-traffic-filtering/)
+6. [NFTables *by Gentoo Wiki*](https://wiki.gentoo.org/wiki/Nftables#Start_logging)
+7. [NFTables jumping *by nftables official wiki*](https://wiki.nftables.org/wiki-nftables/index.php/Jumping_to_chain)
+8. [NFTable examples *by Gentoo Wiki*](https://wiki.gentoo.org/wiki/Nftables/Examples#Basic_NAT)
 
 [1]: https://archern9.github.io/posts/route-pivpn-traffic-via-mullvad/
 [2]: https://mullvad.net/en/
@@ -631,3 +649,5 @@ documentation for a better comprehension of a lot of concepts used above:
 [15]: https://termux.com
 [16]: https://whatismyipaddress.com/nat
 [17]: https://unix.stackexchange.com/questions/14056/what-is-kernel-ip-forwarding
+[18]: https://mullvad.net/en/help/wireguard-and-mullvad-vpn/
+[19]: 
