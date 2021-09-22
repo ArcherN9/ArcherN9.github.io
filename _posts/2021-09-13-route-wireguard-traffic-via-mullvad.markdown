@@ -42,8 +42,7 @@ For me, it was bullet #1 and also to affirm myself that I could do such at thing
 
 ### Environment Details
 
-* A fresh headless [Diet Pi][7] v7.4.2 build ID
-\#140fa04 (dated: 13th September 2021) for ARM-v6 installation
+* A fresh headless [Diet Pi][7] v7.6.2 (dated: 21st September 2021) for ARM-v6 installation
 * RaspberryPi Zero W (henceforth referred to as Pi)
 * `CONFIG_ENABLE_IPV6` is set to `1`; My router is an IPv6 only connection.
 * DietPi Linux kernel: 5.10.52+
@@ -283,9 +282,8 @@ flush ruleset
 # drop me an email!
 table inet pinhole_filter {
 
-    # allow all packets sent by Pi to the outside world
-    chain output {
-        type filter hook output priority 0; policy accept;
+    chain prerouting {
+        type nat hook prerouting priority 0; policy accept;
     }
 
     # This is the default base chain for inpuj
@@ -314,6 +312,17 @@ table inet pinhole_filter {
         iifname "wg0" jump wg0_filter
     }
 
+    chain postrouting {
+        type nat hook postrouting priority 100;
+
+        iifname "wg0" oifname "wlan0" masquerade
+    }
+
+    # allow all packets sent by Pi to the outside world
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+
     # The ICMP chain for bothm ipv4 and ipv6 packets
     chain icmp_filter {
 
@@ -321,7 +330,7 @@ table inet pinhole_filter {
         meta l4proto icmp iifname { "wlan0", "wg0" } ip saddr { 192.168.1.0/24, 10.6.0.0/29 } counter accept comment "icmpv4 : LAN & Wireguard"
 
          # Accept ICMPv6 requests on ipv6
-        meta l4proto icmpv6 iifname { "wlan0", "wg0" } ip6 saddr { fe80::/112, fd00:43:43::/64 } ip6 daddr { ff02::/112, fe80::/112, 2401:4900::/96, fd00:43:43::/64 } counter accept comment "icmpv6: lo & Wireguard"
+        meta l4proto icmpv6 iifname { "wlan0", "wg0" } ip6 saddr { fe80::/112, fd00:43:43::/64 } counter accept comment "icmpv6: lo & Wireguard"
 
         # accept neighbour discovery otherwise IPv6 connectivity breaks
         # Refer: https://www.computernetworkingnotes.com/networking-tutorials/ipv6-neighbor-discovery-protocol-explained.html
@@ -386,7 +395,40 @@ $ sysctl --write net.ipv6.conf.all.forwarding = 1
 net.ipv6.conf.all.forwarding = 1
 ```
 
-## Step Six: Creation of Mullvad Wireguard interfaces
+## Step Six: Setup Pi with NAT routing
+
+Return to the `/etc/wireguard/` directory and edit `wg0.conf` to incorporate the
+new sections identified by `#NEW` tag.
+
+```sh
+[Interface]
+# The Private key is from the server_private_key file created above
+# The key below is just a placeholder. Use your own.
+PrivateKey = gK48mAIwIF0sMYXPWWkErZ2+Ofh/p7tv6UyhljiHX1g=
+
+# This is the server address on the wireguard interface
+Address = 10.6.0.1/24
+
+# The port on which Wireguard listens for connections
+ListenPort = 51820
+
+# Multiple Peer blocks can be added depending on how many peers want to connect
+# to this server. For now, we declare just one
+[Peer]
+
+# The public key of the wireguard client - Could be another desktop, Linux system
+# or a handheld device. The process to create keys on the client largely remain
+# the same. Figure out a way to import the public key generated on the client to
+# this file. Also, the key below is just a placeholder. Use your own.
+PublicKey = DL6qKIOuU2tG4KKqSlMdKwDkSaOv6HM8YSPAr3XHnk8=
+
+# The allowed IPs section declares the IP address of the client. A client may
+# connect to this interface using the declared wireguard public key only if
+# they accept the following IP address on their interface.
+AllowedIPs = 10.6.0.2/24
+```
+
+## Step Seven: Creation of Mullvad Wireguard interfaces
 
 To create Mullvad Wireguard interfaces for each of the servers they provide,
 download the Mullvad Wireguard configuration file. Refer [this guide][18] but
@@ -401,7 +443,8 @@ $ curl -LO https://mullvad.net/media/files/mullvad-wg.sh
 ```
 
 I suggest you read through the mullvad-wg.sh shell script to better understand
-the purpose. 
+the purpose. Search for the DNS entry that reads `DNS="193.138.218.74"` and replace
+it with with your DNS server. Ex: `DNS="192.168.1.2"`
 
 The **for** loop that succeeds *"Writing WireGuard configuration files"* is
 responsible for creating individual Wireguard configuration files to connect to
@@ -465,41 +508,7 @@ If you receive *"Please wait up to 60 seconds for your public key to be added to
 the servers."* as the final output, it would imply your wireguard configurations
 have been generated. Execute `ls -lsa` in `/etc/wireguard` directory to confirm.
 
-## Step Seven: Setup Pi with NAT routing
-
-Return to the `/etc/wireguard/` directory and edit `wg0.conf` to incorporate the
-new sections identified by `#NEW` tag.
-
-```sh
-[Interface]
-# The Private key is from the server_private_key file created above
-# The key below is just a placeholder. Use your own.
-PrivateKey = gK48mAIwIF0sMYXPWWkErZ2+Ofh/p7tv6UyhljiHX1g=
-
-# This is the server address on the wireguard interface
-Address = 10.6.0.1/24
-
-# The port on which Wireguard listens for connections
-ListenPort = 51820
-
-# Multiple Peer blocks can be added depending on how many peers want to connect
-# to this server. For now, we declare just one
-[Peer]
-
-# The public key of the wireguard client - Could be another desktop, Linux system
-# or a handheld device. The process to create keys on the client largely remain
-# the same. Figure out a way to import the public key generated on the client to
-# this file. Also, the key below is just a placeholder. Use your own.
-PublicKey = DL6qKIOuU2tG4KKqSlMdKwDkSaOv6HM8YSPAr3XHnk8=
-
-# The allowed IPs section declares the IP address of the client. A client may
-# connect to this interface using the declared wireguard public key only if
-# they accept the following IP address on their interface.
-AllowedIPs = 10.6.0.2/24
-```
-
 ========================= OLD POST =========================
-
 
 ## Step Three: Creation of pivpn table
 
